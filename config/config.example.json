@@ -1,0 +1,15 @@
+{
+  "controller": {
+    "url": "http://10.0.0.1",
+    "username": "your-username",
+    "password": "your-password",
+    "name": "Main Controller"
+  },
+  "dns": {
+    "target_ip": "10.0.10.31",
+    "show_diff": true,
+    "dry_run": false
+  },
+  "hostnames_file": "config/dns-records.json",
+  "verbose": false
+}
