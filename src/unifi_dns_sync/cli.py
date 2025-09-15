@@ -43,7 +43,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--controller", 
         required=True, 
-        help="Unifi controller URL (e.g., https://10.1.0.1)"
+        help="Unifi controller URL (e.g., https://10.0.0.1)"
     )
     
     parser.add_argument(
@@ -60,8 +60,8 @@ def create_parser() -> argparse.ArgumentParser:
     
     parser.add_argument(
         "--target-ip", 
-        default="10.0.10.31", 
-        help="IP address for DNS records (default: 10.0.10.31)"
+        default="10.0.0.123", 
+        help="IP address for DNS records (default: 10.0.0.123)"
     )
     
     parser.add_argument(

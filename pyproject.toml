@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "unifi-dns-sync"
 version = "1.0.0"
-description = "Synchronize DNS records with Unifi controllers"
+description = "Automatically sync DNS A records on Unifi controllers"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -34,16 +34,6 @@ dependencies = [
     "urllib3>=1.26.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=6.0",
-    "pytest-cov",
-    "black",
-    "flake8",
-    "mypy",
-    "isort",
-]
-
 [project.scripts]
 unifi-dns-sync = "unifi_dns_sync.cli:main"
 
@@ -57,17 +47,3 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.black]
-line-length = 100
-target-version = ['py38']
-
-[tool.isort]
-profile = "black"
-line_length = 100
-
-[tool.mypy]
-python_version = "3.8"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true

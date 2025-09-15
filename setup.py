@@ -11,14 +11,20 @@ with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 # Read requirements
-with open('requirements.txt') as f:
-    requirements = f.read().splitlines()
+try:
+    with open(os.path.join(this_directory, 'requirements.txt')) as f:
+        requirements = f.read().splitlines()
+except FileNotFoundError:
+    requirements = [
+        "requests>=2.28.0",
+        "urllib3>=1.26.0",
+    ]
 
 setup(
     name="unifi-dns-sync",
     version="1.0.0",
     author="cswitenky",
-    description="Synchronize DNS records with Unifi controllers",
+    description="Automatically sync DNS A records on Unifi controllers",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/cswitenky/unifi-dns-sync",

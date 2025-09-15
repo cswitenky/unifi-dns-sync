@@ -19,7 +19,6 @@ class ControllerConfig:
     url: str
     username: str
     password: str
-    name: Optional[str] = None
     
     def __post_init__(self):
         # Clean up URL
@@ -31,7 +30,7 @@ class ControllerConfig:
 @dataclass
 class DNSConfig:
     """Configuration for DNS settings."""
-    target_ip: str = "10.0.10.31"
+    target_ip: str = "10.0.0.123"
     show_diff: bool = True
     dry_run: bool = False
 
@@ -53,12 +52,11 @@ class AppConfig:
         controller = ControllerConfig(
             url=controller_data.get('url', ''),
             username=controller_data.get('username', ''),
-            password=controller_data.get('password', ''),
-            name=controller_data.get('name')
+            password=controller_data.get('password', '')
         )
         
         dns = DNSConfig(
-            target_ip=dns_data.get('target_ip', '10.0.10.31'),
+            target_ip=dns_data.get('target_ip', '10.0.0.123'),
             show_diff=dns_data.get('show_diff', True),
             dry_run=dns_data.get('dry_run', False)
         )
@@ -76,8 +74,7 @@ class AppConfig:
             'controller': {
                 'url': self.controller.url,
                 'username': self.controller.username,
-                'password': self.controller.password,
-                'name': self.controller.name
+                'password': self.controller.password
             },
             'dns': {
                 'target_ip': self.dns.target_ip,
@@ -119,12 +116,11 @@ class ConfigLoader:
         controller = ControllerConfig(
             url=controller_url,
             username=username,
-            password=password,
-            name=os.getenv('UNIFI_CONTROLLER_NAME')
+            password=password
         )
         
         dns = DNSConfig(
-            target_ip=os.getenv('UNIFI_TARGET_IP', '10.0.10.31'),
+            target_ip=os.getenv('UNIFI_TARGET_IP', '10.0.0.123'),
             show_diff=os.getenv('UNIFI_SHOW_DIFF', 'true').lower() == 'true',
             dry_run=os.getenv('UNIFI_DRY_RUN', 'false').lower() == 'true'
         )

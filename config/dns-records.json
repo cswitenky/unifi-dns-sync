@@ -1,6 +1,6 @@
 [
   { "duck.switenky.com": "10.0.10.11" },
-  { "horse.switenky.com": "10.0.20.12" },
+  "horse.switenky.com",
   { "cat.switenky.com": "10.0.30.14" },
   { "dog.switenky.com": "10.0.40.15" }
 ]

@@ -21,15 +21,15 @@ logger = logging.getLogger(__name__)
 class UnifiDNSManager:
     """Manages DNS records on Unifi controllers."""
     
-    def __init__(self, controller_url: str, username: str, password: str, target_ip: str = "10.0.10.31"):
+    def __init__(self, controller_url: str, username: str, password: str, target_ip: str = "10.0.0.123"):
         """
         Initialize the Unifi DNS Manager.
         
         Args:
-            controller_url: Base URL of the Unifi controller (e.g., https://10.1.0.1)
+            controller_url: Base URL of the Unifi controller (e.g., https://10.0.0.1)
             username: Unifi controller username
             password: Unifi controller password
-            target_ip: IP address to assign to DNS records (default: 10.0.10.31)
+            target_ip: IP address to assign to DNS records (default: 10.0.0.123)
         """
         self.controller_url = controller_url.rstrip('/')
         self.username = username
