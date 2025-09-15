@@ -2,7 +2,7 @@
 
 Automatically sync DNS A records on Unifi controllers via CLI.
 
-![Demo Screenshot](demo.png)
+![Demo Screenshot](https://raw.githubusercontent.com/cswitenky/unifi-dns-sync/main/demo.png)
 
 ## Installation
 
