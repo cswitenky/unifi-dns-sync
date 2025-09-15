@@ -170,24 +170,23 @@ class UnifiDNSManager:
         logger.info(f"Found {len(records)} existing DNS records")
         return records
     
-    def create_dns_record(self, hostname: str) -> Dict:
+    def create_dns_record(self, hostname: str, ip: str = None) -> Dict:
         """
-        Create a new DNS A record.
-        
-        Args:
-            hostname: The hostname/FQDN for the DNS record
-            
-        Returns:
-            Created DNS record dictionary
+        Create a new DNS A record for the given hostname and IP.
+
+        If ip is None the manager's default target_ip will be used to preserve backward compatibility.
         """
+        if ip is None:
+            ip = self.target_ip
+
         payload = {
             "record_type": "A",
-            "value": self.target_ip,
+            "value": ip,
             "key": hostname,
             "enabled": True
         }
-        
-        logger.info(f"Creating DNS record: {hostname} -> {self.target_ip}")
+
+        logger.info(f"Creating DNS record: {hostname} -> {ip}")
         response = self._make_request(
             "POST", 
             "/proxy/network/v2/api/site/default/static-dns",
@@ -213,101 +212,130 @@ class UnifiDNSManager:
             f"/proxy/network/v2/api/site/default/static-dns/{record_id}"
         )
     
-    def sync_dns_records(self, desired_hostnames: List[str], show_diff: bool = True) -> Dict[str, int]:
+    def sync_dns_records(self, desired_entries: List[Dict], show_diff: bool = True) -> Dict[str, int]:
         """
         Synchronize DNS records with the desired list.
-        
+
         Args:
-            desired_hostnames: List of hostnames that should have DNS records
+            desired_entries: List of dicts with 'hostname' and optional 'ip' (None -> use target_ip)
             show_diff: Whether to display a diff of changes
-            
+
         Returns:
             Dictionary with counts of created, deleted, and existing records
         """
         # Get existing records
         existing_records = self.get_existing_dns_records()
-        
-        # Create sets for comparison
-        desired_set = set(desired_hostnames)
-        existing_dict = {record['key']: record for record in existing_records 
-                        if record.get('record_type') == 'A'}
-        existing_set = set(existing_dict.keys())
-        
-        # Find records to create and delete
-        to_create = desired_set - existing_set
-        to_delete = existing_set - desired_set
-        existing_correct = desired_set & existing_set
-        
-        logger.info(f"Synchronization plan:")
-        logger.info(f"  Records to create: {len(to_create)}")
-        logger.info(f"  Records to delete: {len(to_delete)}")
-        logger.info(f"  Records already correct: {len(existing_correct)}")
-        
-        # Store changes for diff display
-        changes = {
-            'created': [],
-            'deleted': [],
-            'unchanged': list(existing_correct)
-        }
-        
-        # Create missing records
+
+        # Build mapping of existing records: hostname -> ip -> record
+        existing_map = {}
+        for record in existing_records:
+            if record.get('record_type') != 'A':
+                continue
+            key = record.get('key')
+            value = record.get('value')
+            if not key:
+                continue
+            existing_map.setdefault(key, {})[value] = record
+
+        # Normalize desired entries into mapping hostname -> ip (single)
+        desired_map = {}
+        for entry in desired_entries:
+            hostname = entry.get('hostname')
+            ip_val = entry.get('ip')  # may be None
+            if ip_val is None:
+                desired_ip = self.target_ip
+            else:
+                desired_ip = ip_val
+            desired_map[hostname] = desired_ip
+
+        desired_hostnames = set(desired_map.keys())
+        existing_hostnames = set(existing_map.keys())
+
+        # Determine hostnames to remove entirely (present in existing but not in desired)
+        hosts_to_remove = existing_hostnames - desired_hostnames
+
+        # Prepare counters and change lists
         created_count = 0
-        for hostname in to_create:
-            try:
-                self.create_dns_record(hostname)
-                changes['created'].append(hostname)
-                created_count += 1
-            except Exception as e:
-                logger.error(f"Failed to create record for {hostname}: {e}")
-        
-        # Delete obsolete records
         deleted_count = 0
-        for hostname in to_delete:
-            try:
-                record = existing_dict[hostname]
-                self.delete_dns_record(record['_id'], hostname)
-                changes['deleted'].append(hostname)
-                deleted_count += 1
-            except Exception as e:
-                logger.error(f"Failed to delete record for {hostname}: {e}")
-        
+        unchanged_count = 0
+        changes = {'created': [], 'deleted': [], 'unchanged': []}
+
+        # For hostnames present in desired, compare single IP each
+        for hostname, desired_ip in desired_map.items():
+            existing_ips = set(existing_map.get(hostname, {}).keys())
+
+            # If desired_ip already exists, nothing to do
+            if desired_ip in existing_ips:
+                changes['unchanged'].append((hostname, desired_ip))
+                unchanged_count += 1
+            else:
+                # Create the desired ip record
+                try:
+                    self.create_dns_record(hostname, desired_ip)
+                    changes['created'].append((hostname, desired_ip))
+                    created_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to create record for {hostname} -> {desired_ip}: {e}")
+
+                # Delete any other A records that exist for this hostname (because only one IP allowed)
+                for ip, record in list(existing_map.get(hostname, {}).items()):
+                    try:
+                        self.delete_dns_record(record['_id'], hostname)
+                        changes['deleted'].append((hostname, ip))
+                        deleted_count += 1
+                    except Exception as e:
+                        logger.error(f"Failed to delete record for {hostname} -> {ip}: {e}")
+
+        # Delete hostnames that are no longer desired
+        for hostname in hosts_to_remove:
+            for ip, record in existing_map.get(hostname, {}).items():
+                try:
+                    self.delete_dns_record(record['_id'], hostname)
+                    changes['deleted'].append((hostname, ip))
+                    deleted_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to delete record for {hostname} -> {ip}: {e}")
+
         # Display diff if there were changes
         if show_diff and (changes['created'] or changes['deleted']):
             self._display_diff(changes)
         elif not (changes['created'] or changes['deleted']):
             logger.info("No changes made - DNS records are already synchronized")
-        
+
         return {
             'created': created_count,
             'deleted': deleted_count,
-            'existing': len(existing_correct)
+            'existing': unchanged_count
         }
     
-    def _display_diff(self, changes: Dict[str, List[str]]) -> None:
-        """Display a diff-style summary of DNS record changes."""
+    def _display_diff(self, changes: Dict[str, List[tuple]]) -> None:
+        """Display a diff-style summary of DNS record changes.
+
+        Accepts changes lists containing (hostname, ip) tuples.
+        """
         print("\n" + "="*60)
         print("DNS RECORD CHANGES")
         print("="*60)
-        
+
         # Show deletions (red/minus)
         if changes['deleted']:
             print(f"\n❌ DELETED ({len(changes['deleted'])} records):")
-            for hostname in sorted(changes['deleted']):
-                print(f"  - {hostname} -> {self.target_ip}")
+            for hostname, ip in sorted(changes['deleted']):
+                print(f"  - {hostname} -> {ip}")
         # Show additions (green/plus) 
         if changes['created']:
             print(f"\n✅ CREATED ({len(changes['created'])} records):")
-            for hostname in sorted(changes['created']):
-                print(f"  + {hostname} -> {self.target_ip}")
-        
+            for hostname, ip in sorted(changes['created']):
+                print(f"  + {hostname} -> {ip}")
+
         # Show unchanged (for context)
         if changes['unchanged']:
             print(f"\n⚪ UNCHANGED ({len(changes['unchanged'])} records):")
-            for hostname in sorted(changes['unchanged']):
-                print(f"    {hostname} -> {self.target_ip}")
-        
+            for hostname, ip in sorted(changes['unchanged']):
+                print(f"    {hostname} -> {ip}")
+
         print("\n" + "="*60)
-        
+
         # Summary line
         total_changes = len(changes['created']) + len(changes['deleted'])
         print(f"SUMMARY: {total_changes} changes ({len(changes['created'])} created, {len(changes['deleted'])} deleted)")

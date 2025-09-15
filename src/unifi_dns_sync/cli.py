@@ -37,7 +37,7 @@ def create_parser() -> argparse.ArgumentParser:
         "json_file", 
         nargs="?", 
         default="-", 
-        help="Path to JSON file containing list of hostnames, or '-' for stdin (default: stdin)"
+        help="Path to JSON file containing hostnames or host-to-IP mappings, or '-' for stdin (default: stdin)"
     )
     
     parser.add_argument(
@@ -85,25 +85,61 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_dry_run(dns_manager: UnifiDNSManager, hostnames: list, show_diff: bool) -> None:
-    """Run in dry-run mode to show what would change."""
+def run_dry_run(dns_manager: UnifiDNSManager, desired_entries: list, show_diff: bool) -> None:
+    """Run in dry-run mode to show what would change.
+
+    desired_entries: list of normalized dicts with 'hostname' and optional 'ip'.
+    """
     logger.info("DRY RUN MODE - No changes will be made")
-    logger.info(f"Would sync these hostnames: {hostnames}")
-    
+    logger.info(f"Would sync these entries: {desired_entries}")
+
     if show_diff:
         # Get current state and show what would change
         existing_records = dns_manager.get_existing_dns_records()
-        existing_dict = {record['key']: record for record in existing_records 
-                       if record.get('record_type') == 'A'}
-        existing_set = set(existing_dict.keys())
-        desired_set = set(hostnames)
-        
-        changes = {
-            'created': list(desired_set - existing_set),
-            'deleted': list(existing_set - desired_set),
-            'unchanged': list(desired_set & existing_set)
-        }
-        
+        # Build existing map hostname -> set of ips
+        existing_map = {}
+        for record in existing_records:
+            if record.get('record_type') != 'A':
+                continue
+            existing_map.setdefault(record.get('key'), set()).add(record.get('value'))
+
+        # Normalize desired entries into hostname -> single ip mapping
+        desired_map = {}
+        for entry in desired_entries:
+            hostname = entry.get('hostname') if isinstance(entry, dict) else entry
+            ip = entry.get('ip') if isinstance(entry, dict) else None
+            if ip is None:
+                desired_map[hostname] = {dns_manager.target_ip}
+            else:
+                desired_map[hostname] = {ip}
+
+        # Construct changes structure compatible with _display_diff
+        changes = {'created': [], 'deleted': [], 'unchanged': []}
+
+        desired_hostnames = set(desired_map.keys())
+        existing_hostnames = set(existing_map.keys())
+
+        for hostname in desired_hostnames:
+            desired_ips = desired_map.get(hostname, {dns_manager.target_ip})
+            existing_ips = existing_map.get(hostname, set())
+
+            # Since only one IP is allowed per hostname, take the single desired IP
+            desired_ip = next(iter(desired_ips))
+
+            if desired_ip in existing_ips:
+                changes['unchanged'].append((hostname, desired_ip))
+            else:
+                changes['created'].append((hostname, desired_ip))
+
+            # Any existing IPs that are not the desired one should be deleted
+            for ip in sorted(existing_ips - {desired_ip}):
+                changes['deleted'].append((hostname, ip))
+
+        # Hostnames present in existing but not desired should be deleted entirely
+        for hostname in sorted(existing_hostnames - desired_hostnames):
+            for ip in sorted(existing_map.get(hostname, [])):
+                changes['deleted'].append((hostname, ip))
+
         logger.info("\nDRY RUN - PREVIEW OF CHANGES:")
         print()  # Add a blank line for better separation
         dns_manager._display_diff(changes)
@@ -118,21 +154,21 @@ def main() -> None:
     setup_logging(args.verbose)
     
     try:
-        # Load desired hostnames
+        # Load desired hostnames/entries
         if args.json_file == '-':
             logger.info("Loading hostnames from stdin...")
         else:
             logger.info(f"Loading hostnames from {args.json_file}")
-        
-        hostnames = DNSSync.load_hostnames_from_json(args.json_file)
-        
-        # Filter valid hostnames
-        valid_hostnames = DNSSync.filter_valid_hostnames(hostnames)
-        if len(valid_hostnames) != len(hostnames):
-            logger.warning(f"Filtered {len(hostnames) - len(valid_hostnames)} invalid hostnames")
-        
-        logger.info(f"Loaded {len(valid_hostnames)} valid hostnames")
-        
+
+        entries = DNSSync.load_hostnames_from_json(args.json_file)
+
+        # Filter and validate entries
+        valid_entries = DNSSync.filter_valid_hostnames(entries)
+        if len(valid_entries) != len(entries):
+            logger.warning(f"Filtered {len(entries) - len(valid_entries)} invalid host entries")
+
+        logger.info(f"Loaded {len(valid_entries)} valid host entries")
+
         # Initialize DNS manager
         dns_manager = UnifiDNSManager(
             controller_url=args.controller,
@@ -140,13 +176,13 @@ def main() -> None:
             password=args.password,
             target_ip=args.target_ip
         )
-        
+
         if args.dry_run:
-            run_dry_run(dns_manager, valid_hostnames, args.show_diff)
+            run_dry_run(dns_manager, valid_entries, args.show_diff)
             return
-        
+
         # Perform synchronization
-        results = dns_manager.sync_dns_records(valid_hostnames, show_diff=args.show_diff)
+        results = dns_manager.sync_dns_records(valid_entries, show_diff=args.show_diff)
         
         # Report results
         logger.info("Synchronization completed successfully!")

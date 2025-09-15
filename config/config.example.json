@@ -6,7 +6,7 @@
     "name": "Main Controller"
   },
   "dns": {
-    "target_ip": "10.0.10.31",
+    "target_ip": "10.0.0.1",
     "show_diff": true,
     "dry_run": false
   },

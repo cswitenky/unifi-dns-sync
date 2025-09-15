@@ -18,12 +18,14 @@ A modern Python package for synchronizing DNS A records between JSON configurati
 ### From Source
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/cswitenky/unifi-dns-sync.git
    cd unifi-dns-sync
    ```
 
 2. Install in development mode:
+
    ```bash
    pip install -e .
    ```
@@ -49,16 +51,19 @@ unifi-dns-sync config/dns-records.json \
   --username your-username \
   --password your-password
 ```
+
 Note: For those with Ubiquiti accounts with MFA enabled, you can create a local account on the Unifi controller with approporiate permissions and use those credentials instead of your Ubiquiti account credentials.
 
 ### Method 2: Configuration File
 
 1. Create a configuration file:
+
    ```bash
    cp config/config.example.json config.json
    ```
 
 2. Edit `config.json` with your settings:
+
    ```json
    {
      "controller": {
@@ -82,6 +87,7 @@ Note: For those with Ubiquiti accounts with MFA enabled, you can create a local 
 ### Method 3: Environment Variables
 
 Set the following environment variables:
+
 ```bash
 export UNIFI_CONTROLLER_URL="https://10.1.0.1"
 export UNIFI_USERNAME="your-username"
@@ -91,6 +97,7 @@ export UNIFI_HOSTNAMES_FILE="config/dns-records.json"
 ```
 
 Then run:
+
 ```bash
 unifi-dns-sync
 ```
@@ -111,6 +118,7 @@ unifi-dns-sync
 ### Examples
 
 #### Using a JSON File
+
 ```bash
 unifi-dns-sync config/dns-records.json \
   --controller https://10.1.0.1 \
@@ -120,6 +128,7 @@ unifi-dns-sync config/dns-records.json \
 ```
 
 #### Using stdin
+
 ```bash
 echo '["host1.example.com", "host2.example.com"]' | \
   unifi-dns-sync - \
@@ -129,6 +138,7 @@ echo '["host1.example.com", "host2.example.com"]' | \
 ```
 
 #### Dry Run Mode
+
 ```bash
 unifi-dns-sync config/dns-records.json \
   --controller https://10.1.0.1 \
@@ -170,6 +180,7 @@ unifi-dns-sync/
 ### Development Setup
 
 1. Clone and install in development mode:
+
    ```bash
    git clone https://github.com/cswitenky/unifi-dns-sync.git
    cd unifi-dns-sync
@@ -177,11 +188,13 @@ unifi-dns-sync/
    ```
 
 2. Run tests:
+
    ```bash
    make test
    ```
 
 3. Run linting:
+
    ```bash
    make lint
    ```
@@ -207,13 +220,39 @@ unifi-dns-sync/
 
 ### JSON Hostnames File
 
-The hostnames file should contain a JSON array of hostnames:
+The hostnames file now supports a couple of formats. Each DNS entry may specify at most one IP. If an entry does not include an IP, the configured `target_ip` will be used.
+
+1. Simple list of hostnames (backwards-compatible):
+
+```json
+["service1.example.com", "service2.example.com", "api.example.com"]
+```
+
+2. Shorthand mapping — hostname as the object key with a single-string IP value:
+
+```json
+[{ "duck.example.com": "10.0.10.11" }, { "horse.example.com": "10.0.20.12" }]
+```
+
+3. Explicit object form with `hostname` and optional `ip` fields (omit `ip` to use the global `target_ip`):
 
 ```json
 [
-    "service1.example.com",
-    "service2.example.com",
-    "api.example.com"
+  { "hostname": "duck.example.com", "ip": "10.0.10.11" },
+  { "hostname": "horse.example.com" }
+]
+```
+
+Important: lists of multiple IPs for a single hostname are not allowed and will be rejected by the tool. If you need multiple A records for the same hostname, open an issue or request; the current design enforces exactly one IP per hostname.
+
+Example (your project config):
+
+```json
+[
+  { "duck.switenky.com": "10.0.10.11" },
+  { "horse.switenky.com": "10.0.20.12" },
+  { "cat.switenky.com": "10.0.30.14" },
+  { "dog.switenky.com": "10.0.40.15" }
 ]
 ```
 
@@ -241,7 +280,7 @@ The hostnames file should contain a JSON array of hostnames:
 
 - `UNIFI_CONTROLLER_URL`: Controller URL
 - `UNIFI_USERNAME`: Username
-- `UNIFI_PASSWORD`: Password  
+- `UNIFI_PASSWORD`: Password
 - `UNIFI_TARGET_IP`: Target IP address
 - `UNIFI_HOSTNAMES_FILE`: Path to hostnames file
 - `UNIFI_SHOW_DIFF`: Show diff (true/false)
@@ -271,10 +310,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 If you encounter any issues or have questions, please open an issue on the GitHub repository.
-  --controller https://10.1.0.1 \
-  --username admin \
-  --password mypassword
-```
+--controller https://10.1.0.1 \
+ --username admin \
+ --password mypassword
+
+````
 
 #### Using stdin with echo
 ```bash
@@ -283,9 +323,10 @@ python3 unifi-sync.py \
   --controller https://10.1.0.1 \
   --username admin \
   --password mypassword
-```
+````
 
 #### Using stdin with heredoc
+
 ```bash
 python3 unifi-sync.py --controller https://10.1.0.1 --username admin --password mypassword << 'EOF'
 [
@@ -297,6 +338,7 @@ EOF
 ```
 
 #### Using stdin with pipe from file
+
 ```bash
 cat dns-records.json | python3 unifi-sync.py \
   --controller https://10.1.0.1 \
@@ -305,6 +347,7 @@ cat dns-records.json | python3 unifi-sync.py \
 ```
 
 #### Dry Run (Test Mode)
+
 ```bash
 python3 unifi-sync.py dns-records.json \
   --controller https://10.1.0.1 \
@@ -314,6 +357,7 @@ python3 unifi-sync.py dns-records.json \
 ```
 
 #### Sync with Custom Target IP
+
 ```bash
 echo '["test.switenky.com"]' | python3 unifi-sync.py \
   --controller https://10.0.10.1 \
@@ -323,6 +367,7 @@ echo '["test.switenky.com"]' | python3 unifi-sync.py \
 ```
 
 #### Sync Multiple Controllers
+
 ```bash
 # Frederick Unifi
 echo '["service1.switenky.com", "service2.switenky.com"]' | \
@@ -331,7 +376,7 @@ python3 unifi-sync.py \
   --username admin \
   --password mypassword
 
-# Seattle Unifi  
+# Seattle Unifi
 echo '["service1.switenky.com", "service2.switenky.com"]' | \
 python3 unifi-sync.py \
   --controller https://10.0.10.1 \
@@ -340,6 +385,7 @@ python3 unifi-sync.py \
 ```
 
 #### Dynamic JSON Generation
+
 ```bash
 # Generate JSON list from environment or other sources
 SERVICES=("bazarr" "radarr" "sonarr" "jellyfin")
@@ -356,11 +402,11 @@ The JSON file should contain a simple list of hostnames:
 
 ```json
 [
-    "bazarr.switenky.com",
-    "radarr.switenky.com", 
-    "sonarr.switenky.com",
-    "jellyfin.switenky.com",
-    "portainer.switenky.com"
+  "bazarr.switenky.com",
+  "radarr.switenky.com",
+  "sonarr.switenky.com",
+  "jellyfin.switenky.com",
+  "portainer.switenky.com"
 ]
 ```
 
@@ -400,14 +446,17 @@ This script can be easily integrated into your existing Ansible playbooks:
 ## Troubleshooting
 
 ### SSL Certificate Issues
+
 The script disables SSL verification for self-signed certificates. If you're using valid certificates, you can modify the script to enable verification.
 
 ### Authentication Issues
+
 - Ensure your username and password are correct
 - Check that the user has sufficient privileges on the Unifi controller
 - Verify the controller URL is accessible
 
 ### Network Issues
+
 - Ensure the script can reach the Unifi controller
 - Check firewall rules and network connectivity
 - Verify the controller is running and responding
