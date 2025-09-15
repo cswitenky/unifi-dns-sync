@@ -52,7 +52,7 @@ python -m unifi_dns_sync config/dns-records.json \
 
 ## JSON Formats
 
-**Simple hostnames** (uses --target-ip):
+**Simple hostnames** (uses `--target-ip`):
 
 ```json
 ["host1.com", "host2.com"]
