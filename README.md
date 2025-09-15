@@ -39,7 +39,8 @@ Run the sync:
 python -m unifi_dns_sync config/dns-records.json \
   --controller https://10.0.0.1 \
   --username admin \
-  --password your-password
+  --password your-password \
+  --target-ip 10.0.0.123 # Optional for hostnames without explicit IPs
 ```
 
 ## Options
