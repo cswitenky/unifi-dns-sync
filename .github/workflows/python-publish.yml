@@ -26,6 +26,22 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Set version from Git tag
+        run: |
+          # Get version from git tag (remove 'v' prefix if present)
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # Update pyproject.toml with the tag version
+          python -c "
+          import re
+          with open('pyproject.toml', 'r') as f:
+              content = f.read()
+          content = re.sub(r'version = \"[^\"]*\"', f'version = \"$VERSION\"', content)
+          with open('pyproject.toml', 'w') as f:
+              f.write(content)
+          "
+
       - name: Build release distributions
         run: |
           # NOTE: put your own distribution build steps here.

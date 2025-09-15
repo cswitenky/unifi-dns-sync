@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "unifi-dns-sync"
-version = "1.0.0"
+version = "0.0.0-dev"
 description = "Automatically sync DNS A records on Unifi controllers"
 readme = "README.md"
 requires-python = ">=3.8"
